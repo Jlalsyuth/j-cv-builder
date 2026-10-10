@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   FileText,
   Download,
@@ -25,15 +25,14 @@ import {
   Code,
   FolderOpen,
   Cloud,
-  CloudCheck,
   Check,
   LogOut,
-  LogIn,
   AlertCircle,
-  Edit2
+  Edit2,
+  Loader2
 } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from './lib/supabaseClient';
-import AuthModal from './components/AuthModal';
+import AuthScreen from './components/AuthScreen';
 import DashboardModal from './components/DashboardModal';
 
 const LinkedinIcon = ({ className = "w-3 h-3" }) => (
@@ -49,9 +48,36 @@ const GithubIcon = ({ className = "w-3 h-3" }) => (
 );
 
 // ============================================================================
-// DUMMY DATA DEFAULT (STRUKTUR ATS LENGKAP J CV STYLE)
+// TEMPLATE AWAL CV: KOSONG (INPUT TEXTBOX HANYA MENGGUNAKAN PLACEHOLDER CONTOH)
 // ============================================================================
-const DEFAULT_CV_DATA = {
+const EMPTY_CV_DATA = {
+  personalInfo: {
+    fullName: "",
+    jobTitle: "",
+    email: "",
+    phone: "",
+    location: "",
+    linkedin: "",
+    github: "",
+    website: "",
+    showPhoto: false,
+    photoUrl: ""
+  },
+  summary: "",
+  education: [],
+  experience: [],
+  organization: [],
+  skills: {
+    hardSkills: "",
+    softSkills: "",
+    languages: ""
+  },
+  achievements: [],
+  projects: []
+};
+
+// Data contoh/demo opsional jika pengguna ingin memuat sampel cepat
+const DEMO_SAMPLE_CV = {
   personalInfo: {
     fullName: "MUHAMMAD ARYA PRATAMA",
     jobTitle: "Software Engineer | Full-Stack & Frontend Specialist",
@@ -64,7 +90,7 @@ const DEFAULT_CV_DATA = {
     showPhoto: false,
     photoUrl: ""
   },
-  summary: "Lulusan Ilmu Komputer Universitas Indonesia (IPK 3.88) dengan spesialisasi Rekayasa Perangkat Lunak dan Pengembangan Web Skala Besar. Memiliki pengalaman 2+ tahun membangun aplikasi berbasis React, TypeScript, dan Node.js dengan rekam jejak sukses mengoptimalkan performa Core Web Vitals hingga 28% serta memenangkan kompetisi Hackathon tingkat nasional. Terbiasa dengan metodologi Agile, kolaborasi lintas divisi, dan penulisan kode teruji yang bersih.",
+  summary: "Lulusan Ilmu Komputer dengan pengalaman 2+ tahun membangun aplikasi berbasis React, TypeScript, dan Node.js. Terbiasa memimpin tim kepanitiaan teknologi, mengoptimalkan performa web hingga 28%, serta memenangkan kompetisi Hackathon tingkat nasional.",
   education: [
     {
       id: "edu-1",
@@ -75,9 +101,8 @@ const DEFAULT_CV_DATA = {
       startDate: "Agu 2020",
       endDate: "Jul 2024",
       bullets: [
-        "Penerima Beasiswa Prestasi Unggulan Kemendikbudristek selama 4 semester berturut-turut atas pencapaian akademik.",
-        "Menyelesaikan tugas akhir bertajuk 'Optimasi Sistem Rekomendasi E-Commerce Menggunakan Graph Neural Network' dengan nilai A.",
-        "Asisten Dosen untuk mata kuliah Struktur Data & Algoritma dan Pemrograman Web (membimbing 140+ mahasiswa)."
+        "Penerima Beasiswa Prestasi Unggulan Kemendikbudristek atas pencapaian akademik.",
+        "Asisten Dosen untuk mata kuliah Struktur Data & Algoritma dan Pemrograman Web."
       ]
     }
   ],
@@ -90,22 +115,8 @@ const DEFAULT_CV_DATA = {
       startDate: "Feb 2024",
       endDate: "Agu 2024",
       bullets: [
-        "Mengembangkan 12+ komponen UI reusable berstandar aksesibilitas tinggi menggunakan React, TypeScript, dan Tailwind CSS untuk portal Merchant Partner.",
-        "Meningkatkan skor Largest Contentful Paint (LCP) sebesar 28% melalui implementasi dynamic code-splitting dan image optimization.",
-        "Berkolaborasi aktif dengan Product Manager, UI/UX Designer, dan Backend Engineer dalam siklus sprint agile 2-mingguan."
-      ]
-    },
-    {
-      id: "exp-2",
-      company: "Traveloka",
-      role: "Junior Web Developer (Contract)",
-      location: "Tangerang, Banten",
-      startDate: "Sep 2023",
-      endDate: "Jan 2024",
-      bullets: [
-        "Memodernisasi antarmuka checkout flow pemesanan tiket dengan penanganan state asynchronous yang melayani 40.000+ sesi harian.",
-        "Memangkas waktu latensi client-side query hingga 35% dengan arsitektur TanStack Query dan intelligent caching.",
-        "Mengimplementasikan automated unit & end-to-end tests menggunakan Jest dan Cypress dengan code coverage mencapai 85%."
+        "Mengembangkan 12+ komponen UI reusable berstandar aksesibilitas tinggi menggunakan React & Tailwind CSS.",
+        "Meningkatkan skor LCP sebesar 28% melalui implementasi dynamic code-splitting."
       ]
     }
   ],
@@ -118,63 +129,32 @@ const DEFAULT_CV_DATA = {
       startDate: "Jan 2023",
       endDate: "Des 2023",
       bullets: [
-        "Memimpin tim beranggotakan 14 mahasiswa dalam merancang, membangun, dan merilis portal informasi terpadu yang diakses 2.500+ mahasiswa aktif.",
-        "Menginisiasi program Tech Mentorship & Web Development Bootcamp yang melatih 120 peserta siap magang.",
-        "Mengelola infrastruktur server cloud fakultas dengan pencapaian zero unplanned downtime sepanjang kepengurusan."
-      ]
-    },
-    {
-      id: "org-2",
-      name: "Google Developer Student Clubs (GDSC) UI",
-      role: "Core Team Lead - Web Development",
-      location: "Depok, Indonesia",
-      startDate: "Agu 2022",
-      endDate: "Jul 2023",
-      bullets: [
-        "Menyelenggarakan 6 seminar teknis dan hands-on workshop web development dengan total 750+ peserta.",
-        "Membimbing 4 proyek open-source mahasiswa untuk kompetisi global Google Solution Challenge."
+        "Memimpin tim beranggotakan 14 mahasiswa dalam membangun portal informasi terpadu yang diakses 2.500+ mahasiswa aktif."
       ]
     }
   ],
   skills: {
-    hardSkills: "React.js, Next.js, TypeScript, JavaScript (ES6+), HTML5/CSS3, Tailwind CSS, Node.js, Express, PostgreSQL, RESTful APIs, Git, Docker, Jest",
-    softSkills: "Problem Solving, Agile/Scrum, Kepemimpinan Tim, Komunikasi Efektif, Cross-functional Collaboration",
-    languages: "Bahasa Indonesia (Native), English (Professional Working Proficiency - TOEFL ITP 610)"
+    hardSkills: "React.js, Next.js, TypeScript, JavaScript (ES6+), Tailwind CSS, Node.js, PostgreSQL, Git",
+    softSkills: "Problem Solving, Agile/Scrum, Kepemimpinan Tim, Komunikasi Efektif",
+    languages: "Bahasa Indonesia (Native), English (Professional Working Proficiency)"
   },
   achievements: [
     {
       id: "ach-1",
-      title: "Juara 1 - National Hackathon BCA Finhacks 2023",
+      title: "Juara 1 - National Hackathon 2023",
       year: "2023",
-      description: "Membangun prototipe aplikasi asisten keuangan mikro untuk UMKM berbasis AI dari seleksi 350+ tim se-Indonesia."
-    },
-    {
-      id: "ach-2",
-      title: "Finalis Top 5 - Arkavidia Informatics Festival ITB",
-      year: "2022",
-      description: "Kompetisi Competitive Programming dan Inovasi Aplikasi Web tingkat nasional."
+      description: "Membangun prototipe asisten keuangan UMKM berbasis AI dari seleksi 350+ tim se-Indonesia."
     }
   ],
   projects: [
     {
       id: "proj-1",
-      name: "CareerPath - AI-Powered Resume & Job Matcher",
+      name: "CareerPath - AI-Powered Resume Matcher",
       role: "Lead Fullstack Developer",
       year: "2024",
       link: "github.com/aryapratama/careerpath",
       bullets: [
-        "Mengembangkan platform web analisis kecocokan resume ATS terhadap deskripsi lowongan kerja secara real-time.",
-        "Membangun arsitektur frontend cepat menggunakan Next.js App Router dan Tailwind CSS dengan 1.500+ monthly active users."
-      ]
-    },
-    {
-      id: "proj-2",
-      name: "SaaS Analytics Dashboard UI Kit",
-      role: "Creator & Maintainer",
-      year: "2023",
-      link: "github.com/aryapratama/saas-dashboard",
-      bullets: [
-        "Membangun library open-source template dashboard admin interaktif yang meraih 450+ bintang di GitHub."
+        "Platform web evaluasi kesesuaian kata kunci resume ATS terhadap lowongan kerja secara real-time."
       ]
     }
   ]
@@ -184,7 +164,11 @@ const DEFAULT_CV_DATA = {
 // MAIN COMPONENT: APP / J CV BUILDER
 // ============================================================================
 export default function App() {
-  // Current Active Resume Document
+  // Auth state & Access Gate
+  const [currentUser, setCurrentUser] = useState(null);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+  // Current Active Resume Document (Default Kosong)
   const [cvData, setCvData] = useState(() => {
     const saved = localStorage.getItem('j_cv_data');
     if (saved) {
@@ -194,7 +178,7 @@ export default function App() {
         console.error('Failed to parse saved CV data:', e);
       }
     }
-    return DEFAULT_CV_DATA;
+    return EMPTY_CV_DATA;
   });
 
   const [currentResumeId, setCurrentResumeId] = useState(() => {
@@ -202,13 +186,11 @@ export default function App() {
   });
 
   const [resumeTitle, setResumeTitle] = useState(() => {
-    return localStorage.getItem('j_cv_active_title') || 'Resume Software Engineer';
+    return localStorage.getItem('j_cv_active_title') || 'Resume ATS Baru';
   });
 
-  // Supabase Auth & Multi-CV State
-  const [currentUser, setCurrentUser] = useState(null);
+  // Multi-CV & Modal states
   const [userResumes, setUserResumes] = useState([]);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isDashboardModalOpen, setIsDashboardModalOpen] = useState(false);
   const [isLoadingResumes, setIsLoadingResumes] = useState(false);
   const [saveStatus, setSaveStatus] = useState('saved'); // 'saved' | 'saving' | 'unsaved'
@@ -234,19 +216,26 @@ export default function App() {
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const previewRef = useRef(null);
 
-  // 1. Inisialisasi Supabase Auth Listener
+  // 1. Inisialisasi Supabase Auth Listener & Access Gate Check
   useEffect(() => {
-    if (!isSupabaseConfigured || !supabase) return;
+    if (!isSupabaseConfigured || !supabase) {
+      setIsCheckingAuth(false);
+      return;
+    }
 
-    // Ambil sesi awal
+    // Ambil sesi aktif saat ini
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setCurrentUser(session.user);
         fetchUserResumes(session.user.id);
       }
+      setIsCheckingAuth(false);
+    }).catch((err) => {
+      console.error('Failed to get auth session:', err);
+      setIsCheckingAuth(false);
     });
 
-    // Pasang listener perubahan auth (login, logout, refresh token)
+    // Listener perubahan status auth (login / logout)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const user = session?.user || null;
       setCurrentUser(user);
@@ -255,6 +244,7 @@ export default function App() {
       } else {
         setUserResumes([]);
       }
+      setIsCheckingAuth(false);
     });
 
     return () => {
@@ -262,7 +252,7 @@ export default function App() {
     };
   }, []);
 
-  // 2. Mengambil daftar resume pengguna dari Supabase
+  // 2. Mengambil daftar resume pengguna dari database Supabase
   const fetchUserResumes = async (userId) => {
     if (!isSupabaseConfigured || !supabase) return;
     setIsLoadingResumes(true);
@@ -277,17 +267,16 @@ export default function App() {
 
       if (data && data.length > 0) {
         setUserResumes(data);
-        // Jika belum ada resume yang dibuka, buka yang paling baru
         if (!currentResumeId) {
           const active = data[0];
           setCurrentResumeId(active.id);
           setResumeTitle(active.title);
-          if (active.content && Object.keys(active.content).length > 0) {
+          if (active.content) {
             setCvData(active.content);
           }
         }
       } else {
-        // Jika pengguna baru belum punya resume di cloud, simpan resume default awal
+        // Jika akun baru belum memiliki CV di cloud, buat 1 CV awal kosong
         saveInitialResumeToCloud(userId);
       }
     } catch (err) {
@@ -297,7 +286,6 @@ export default function App() {
     }
   };
 
-  // Simpan resume awal untuk pengguna baru
   const saveInitialResumeToCloud = async (userId) => {
     try {
       const { data, error } = await supabase
@@ -305,7 +293,7 @@ export default function App() {
         .insert([
           {
             user_id: userId,
-            title: resumeTitle || 'Resume Utama ATS',
+            title: resumeTitle || 'Resume ATS Baru',
             content: cvData,
           },
         ])
@@ -323,7 +311,6 @@ export default function App() {
 
   // 3. Simpan perubahan ke Cloud (Supabase) dan LocalStorage
   const handleSaveToCloud = async () => {
-    // Selalu simpan ke local storage sebagai backup offline
     localStorage.setItem('j_cv_data', JSON.stringify(cvData));
     localStorage.setItem('j_cv_active_title', resumeTitle);
     if (currentResumeId) localStorage.setItem('j_cv_active_id', currentResumeId);
@@ -336,7 +323,6 @@ export default function App() {
     setSaveStatus('saving');
     try {
       if (currentResumeId) {
-        // Update resume yang sedang aktif
         const { error } = await supabase
           .from('resumes')
           .update({
@@ -348,7 +334,6 @@ export default function App() {
 
         if (error) throw error;
       } else {
-        // Buat baru jika belum ada ID
         const { data, error } = await supabase
           .from('resumes')
           .insert([
@@ -367,7 +352,6 @@ export default function App() {
       }
 
       setSaveStatus('saved');
-      // Perbarui daftar di memori
       fetchUserResumes(currentUser.id);
     } catch (err) {
       console.error('Failed to save to cloud:', err);
@@ -375,19 +359,20 @@ export default function App() {
     }
   };
 
-  // Auto-Save debounced ke LocalStorage & Cloud
+  // Debounced auto-save ke cloud
   useEffect(() => {
+    if (!currentUser) return;
     setSaveStatus('unsaved');
     const timer = setTimeout(() => {
       handleSaveToCloud();
     }, 1500);
 
     return () => clearTimeout(timer);
-  }, [cvData, resumeTitle]);
+  }, [cvData, resumeTitle, currentUser]);
 
-  // Fungsi Buat Resume Baru
+  // Manajemen Multi-CV (Buat, Duplikasi, Hapus, Pilih)
   const handleCreateNewResume = async () => {
-    const newTitle = prompt('Masukkan Judul Resume Baru:', 'Resume Baru ATS');
+    const newTitle = prompt('Masukkan Judul Resume Baru:', 'Resume ATS Baru');
     if (!newTitle) return;
 
     if (currentUser && isSupabaseConfigured && supabase) {
@@ -398,7 +383,7 @@ export default function App() {
             {
               user_id: currentUser.id,
               title: newTitle.trim(),
-              content: DEFAULT_CV_DATA,
+              content: EMPTY_CV_DATA,
             },
           ])
           .select();
@@ -408,22 +393,15 @@ export default function App() {
           setUserResumes(prev => [data[0], ...prev]);
           setCurrentResumeId(data[0].id);
           setResumeTitle(data[0].title);
-          setCvData(DEFAULT_CV_DATA);
+          setCvData(EMPTY_CV_DATA);
           setIsDashboardModalOpen(false);
         }
       } catch (err) {
-        alert('Gagal membuat resume di cloud: ' + err.message);
+        alert('Gagal membuat resume: ' + err.message);
       }
-    } else {
-      // Guest mode
-      setResumeTitle(newTitle.trim());
-      setCvData(DEFAULT_CV_DATA);
-      setCurrentResumeId(null);
-      setIsDashboardModalOpen(false);
     }
   };
 
-  // Fungsi Duplikasi Resume
   const handleDuplicateResume = async (targetResume) => {
     const newTitle = `Salinan - ${targetResume.title}`;
     if (currentUser && isSupabaseConfigured && supabase) {
@@ -447,16 +425,11 @@ export default function App() {
       } catch (err) {
         alert('Gagal menduplikasi resume: ' + err.message);
       }
-    } else {
-      alert('Silakan masuk (login) untuk menduplikasi resume ke cloud.');
     }
   };
 
-  // Fungsi Hapus Resume
   const handleDeleteResume = async (resumeId) => {
-    if (!window.confirm('Apakah Anda yakin ingin menghapus dokumen resume ini? Tindakan ini tidak dapat dibatalkan.')) {
-      return;
-    }
+    if (!window.confirm('Apakah Anda yakin ingin menghapus resume ini?')) return;
 
     if (currentUser && isSupabaseConfigured && supabase) {
       try {
@@ -470,7 +443,6 @@ export default function App() {
         const updated = userResumes.filter(r => r.id !== resumeId);
         setUserResumes(updated);
 
-        // Jika resume yang dihapus adalah yang sedang dibuka, ganti ke resume lain
         if (currentResumeId === resumeId) {
           if (updated.length > 0) {
             setCurrentResumeId(updated[0].id);
@@ -486,21 +458,25 @@ export default function App() {
     }
   };
 
-  // Fungsi Buka / Ganti Resume
   const handleSelectResume = (resume) => {
     setCurrentResumeId(resume.id);
     setResumeTitle(resume.title);
-    setCvData(resume.content || DEFAULT_CV_DATA);
+    setCvData(resume.content || EMPTY_CV_DATA);
   };
 
-  // Fungsi Logout
   const handleLogout = async () => {
-    if (isSupabaseConfigured && supabase) {
-      await supabase.auth.signOut();
+    if (window.confirm('Apakah Anda yakin ingin keluar dari akun?')) {
+      if (isSupabaseConfigured && supabase) {
+        await supabase.auth.signOut();
+      }
+      setCurrentUser(null);
+      setUserResumes([]);
+      setCurrentResumeId(null);
+      setCvData(EMPTY_CV_DATA);
+      localStorage.removeItem('j_cv_data');
+      localStorage.removeItem('j_cv_active_id');
+      localStorage.removeItem('j_cv_active_title');
     }
-    setCurrentUser(null);
-    setUserResumes([]);
-    setCurrentResumeId(null);
   };
 
   // Section toggle handler
@@ -516,7 +492,7 @@ export default function App() {
     setCvData(prev => ({
       ...prev,
       personalInfo: {
-        ...prev.personalInfo,
+        ...(prev.personalInfo || {}),
         [field]: value
       }
     }));
@@ -526,7 +502,7 @@ export default function App() {
     setCvData(prev => ({
       ...prev,
       skills: {
-        ...prev.skills,
+        ...(prev.skills || {}),
         [field]: value
       }
     }));
@@ -534,7 +510,7 @@ export default function App() {
 
   const handleArrayItemChange = (section, index, field, value) => {
     setCvData(prev => {
-      const updatedList = [...prev[section]];
+      const updatedList = [...(prev[section] || [])];
       updatedList[index] = {
         ...updatedList[index],
         [field]: value
@@ -546,20 +522,20 @@ export default function App() {
   const handleAddArrayItem = (section, defaultObj) => {
     setCvData(prev => ({
       ...prev,
-      [section]: [...prev[section], { ...defaultObj, id: `${section}-${Date.now()}` }]
+      [section]: [...(prev[section] || []), { ...defaultObj, id: `${section}-${Date.now()}` }]
     }));
   };
 
   const handleRemoveArrayItem = (section, index) => {
     setCvData(prev => {
-      const updatedList = prev[section].filter((_, i) => i !== index);
+      const updatedList = (prev[section] || []).filter((_, i) => i !== index);
       return { ...prev, [section]: updatedList };
     });
   };
 
   const handleMoveArrayItem = (section, index, direction) => {
     setCvData(prev => {
-      const list = [...prev[section]];
+      const list = [...(prev[section] || [])];
       const targetIndex = index + direction;
       if (targetIndex < 0 || targetIndex >= list.length) return prev;
       const temp = list[index];
@@ -571,8 +547,8 @@ export default function App() {
 
   const handleBulletChange = (section, itemIndex, bulletIndex, value) => {
     setCvData(prev => {
-      const updatedList = [...prev[section]];
-      const updatedBullets = [...updatedList[itemIndex].bullets];
+      const updatedList = [...(prev[section] || [])];
+      const updatedBullets = [...(updatedList[itemIndex].bullets || [])];
       updatedBullets[bulletIndex] = value;
       updatedList[itemIndex] = {
         ...updatedList[itemIndex],
@@ -584,7 +560,7 @@ export default function App() {
 
   const handleAddBullet = (section, itemIndex) => {
     setCvData(prev => {
-      const updatedList = [...prev[section]];
+      const updatedList = [...(prev[section] || [])];
       const updatedBullets = [...(updatedList[itemIndex].bullets || []), ""];
       updatedList[itemIndex] = {
         ...updatedList[itemIndex],
@@ -596,8 +572,8 @@ export default function App() {
 
   const handleRemoveBullet = (section, itemIndex, bulletIndex) => {
     setCvData(prev => {
-      const updatedList = [...prev[section]];
-      const updatedBullets = updatedList[itemIndex].bullets.filter((_, i) => i !== bulletIndex);
+      const updatedList = [...(prev[section] || [])];
+      const updatedBullets = (updatedList[itemIndex].bullets || []).filter((_, i) => i !== bulletIndex);
       updatedList[itemIndex] = {
         ...updatedList[itemIndex],
         bullets: updatedBullets
@@ -606,13 +582,20 @@ export default function App() {
     });
   };
 
-  const handleResetData = () => {
-    if (window.confirm("Apakah Anda yakin ingin mengatur ulang konten resume ini ke template standar?")) {
-      setCvData(DEFAULT_CV_DATA);
+  // Muat Demo / Kosongkan Form
+  const handleLoadDemo = () => {
+    if (window.confirm("Muat data sampel demo untuk melihat contoh pengisian CV?")) {
+      setCvData(DEMO_SAMPLE_CV);
     }
   };
 
-  // Export to PDF via html2pdf.js
+  const handleClearForm = () => {
+    if (window.confirm("Apakah Anda yakin ingin mengosongkan seluruh isi formulir resume ini?")) {
+      setCvData(EMPTY_CV_DATA);
+    }
+  };
+
+  // Export ke PDF via html2pdf.js
   const handleExportPdf = async () => {
     if (!previewRef.current) return;
     setIsExportingPdf(true);
@@ -650,15 +633,42 @@ export default function App() {
     window.print();
   };
 
+  // ==========================================================================
+  // ACCESS GATE: TAMPILKAN LOADING ATAU AUTH SCREEN JIKA BELUM LOGIN
+  // ==========================================================================
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-white font-sans p-4">
+        <Loader2 className="w-10 h-10 animate-spin text-blue-500 mb-3" />
+        <p className="text-sm font-semibold tracking-wide">Memeriksa status autentikasi J CV Builder...</p>
+      </div>
+    );
+  }
+
+  // Jika belum login, tampilkan layar Login/Register (tidak bisa mengakses web)
+  if (!currentUser) {
+    return (
+      <AuthScreen
+        onAuthSuccess={(user) => {
+          setCurrentUser(user);
+          fetchUserResumes(user.id);
+        }}
+      />
+    );
+  }
+
+  // ==========================================================================
+  // WORKSPACE RESUME UTAMA (HANYA DITAMPILKAN KETIKA SUDAH LOGIN)
+  // ==========================================================================
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col font-sans">
       {/* ==================================================================== */}
-      {/* TOP HEADER / NAVBAR (J CV BUILDER SAAS MULTI-USER)                   */}
+      {/* TOP HEADER / NAVBAR */}
       {/* ==================================================================== */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm no-print">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
           
-          {/* Logo & Document Title */}
+          {/* Logo & Editable Resume Title */}
           <div className="flex items-center space-x-3 min-w-0">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-700 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20 shrink-0">
               <FileText className="w-5 h-5" />
@@ -674,70 +684,63 @@ export default function App() {
                 </span>
               </div>
 
-              {/* Editable Resume Title */}
               <div className="flex items-center space-x-1.5 mt-0.5">
                 <input
                   type="text"
                   value={resumeTitle}
                   onChange={(e) => setResumeTitle(e.target.value)}
                   className="text-xs text-slate-600 font-medium bg-transparent hover:bg-slate-100 focus:bg-white focus:ring-1 focus:ring-blue-500 px-1.5 py-0.5 rounded border border-transparent hover:border-slate-300 focus:border-blue-400 max-w-[200px] truncate"
-                  placeholder="Beri nama resume..."
-                  title="Klik untuk mengubah judul dokumen CV ini"
+                  placeholder="Beri judul resume..."
+                  title="Klik untuk mengubah judul dokumen CV"
                 />
                 <Edit2 className="w-3 h-3 text-slate-400 hidden sm:inline" />
               </div>
             </div>
           </div>
 
-          {/* Center Cloud Status */}
+          {/* Cloud Save Status Indicator */}
           <div className="hidden lg:flex items-center space-x-2 text-xs">
             {saveStatus === 'saving' ? (
-              <span className="flex items-center space-x-1 text-slate-500 bg-slate-50 px-2 py-1 rounded-md border border-slate-200">
+              <span className="flex items-center space-x-1 text-slate-500 bg-slate-50 px-2.5 py-1 rounded-md border border-slate-200">
                 <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-600" />
                 <span>Menyimpan ke Cloud...</span>
               </span>
             ) : saveStatus === 'saved' ? (
-              <span className="flex items-center space-x-1 text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200">
+              <span className="flex items-center space-x-1 text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200">
                 <Check className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Tersimpan {currentUser ? 'di Cloud' : 'Lokal'}</span>
+                <span>Tersimpan di Cloud</span>
               </span>
             ) : (
-              <span className="flex items-center space-x-1 text-amber-700 bg-amber-50 px-2 py-1 rounded-md border border-amber-200">
+              <span className="flex items-center space-x-1 text-amber-700 bg-amber-50 px-2.5 py-1 rounded-md border border-amber-200">
                 <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
-                <span>Perubahan Belum Disimpan</span>
+                <span>Ada Perubahan Belum Tersimpan</span>
               </span>
             )}
           </div>
 
-          {/* Quick Actions & Auth Controls */}
+          {/* Actions & User Profile */}
           <div className="flex items-center space-x-2">
             
-            {/* Multi-CV Dashboard button */}
+            {/* Multi-CV Dashboard */}
             <button
-              onClick={() => {
-                if (currentUser) {
-                  setIsDashboardModalOpen(true);
-                } else {
-                  setIsAuthModalOpen(true);
-                }
-              }}
+              onClick={() => setIsDashboardModalOpen(true)}
               className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors border border-slate-300 shadow-sm"
               title="Buka daftar CV Anda"
             >
               <FolderOpen className="w-4 h-4 text-blue-600" />
               <span className="hidden sm:inline">CV Saya</span>
-              {currentUser && userResumes.length > 0 && (
+              {userResumes.length > 0 && (
                 <span className="bg-blue-600 text-white text-[10px] px-1.5 py-0.2 rounded-full font-bold ml-1">
                   {userResumes.length}
                 </span>
               )}
             </button>
 
-            {/* Tombol Simpan Manual */}
+            {/* Simpan Manual */}
             <button
               onClick={handleSaveToCloud}
               className="inline-flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 transition-colors border border-slate-300 shadow-sm"
-              title="Simpan dokumen saat ini"
+              title="Simpan dokumen ke cloud"
             >
               <Cloud className="w-4 h-4 text-slate-600" />
               <span className="hidden md:inline">Simpan</span>
@@ -753,7 +756,7 @@ export default function App() {
               <span>Print</span>
             </button>
 
-            {/* Export to PDF */}
+            {/* Export PDF */}
             <button
               onClick={handleExportPdf}
               disabled={isExportingPdf}
@@ -774,48 +777,25 @@ export default function App() {
 
             <div className="h-6 w-px bg-slate-200 mx-1"></div>
 
-            {/* User Profile / Auth Button */}
-            {currentUser ? (
-              <div className="flex items-center space-x-2">
-                <div
-                  onClick={() => setIsDashboardModalOpen(true)}
-                  className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-bold text-xs flex items-center justify-center cursor-pointer shadow-sm hover:scale-105 transition-transform"
-                  title={`Login sebagai: ${currentUser.email}`}
-                >
-                  {currentUser.email ? currentUser.email.charAt(0).toUpperCase() : 'U'}
-                </div>
-                <button
-                  onClick={handleLogout}
-                  className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                  title="Keluar / Logout"
-                >
-                  <LogOut className="w-4 h-4" />
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => setIsAuthModalOpen(true)}
-                className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors"
+            {/* User Profile Avatar & Logout */}
+            <div className="flex items-center space-x-2">
+              <div
+                onClick={() => setIsDashboardModalOpen(true)}
+                className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-bold text-xs flex items-center justify-center cursor-pointer shadow-sm hover:scale-105 transition-transform"
+                title={`Masuk sebagai: ${currentUser.email}`}
               >
-                <LogIn className="w-4 h-4" />
-                <span>Masuk / Daftar</span>
+                {currentUser.email ? currentUser.email.charAt(0).toUpperCase() : 'U'}
+              </div>
+              <button
+                onClick={handleLogout}
+                className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                title="Keluar / Logout"
+              >
+                <LogOut className="w-4 h-4" />
               </button>
-            )}
+            </div>
           </div>
         </div>
-
-        {/* Guest Warning Banner if not logged in */}
-        {!currentUser && (
-          <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-blue-50 border-t border-b border-blue-100 px-4 py-1.5 text-center text-xs text-blue-900 flex items-center justify-center space-x-2">
-            <span>✨ Masuk untuk menyimpan banyak versi CV Anda ke database cloud Supabase secara gratis.</span>
-            <button
-              onClick={() => setIsAuthModalOpen(true)}
-              className="font-bold underline hover:text-blue-700 ml-1"
-            >
-              Masuk Sekarang
-            </button>
-          </div>
-        )}
       </header>
 
       {/* ==================================================================== */}
@@ -828,23 +808,33 @@ export default function App() {
         {/* ================================================================== */}
         <section className="lg:col-span-5 flex flex-col space-y-4 no-print">
           
-          {/* Header Card Form */}
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+          {/* Header Card Form dengan Opsi Demo & Kosongkan */}
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
               <h2 className="font-bold text-slate-900 text-base flex items-center space-x-2">
                 <span>Form Editor Interaktif</span>
                 <span className="bg-emerald-100 text-emerald-800 text-xs px-2 py-0.5 rounded-full font-medium">Live Sync</span>
               </h2>
-              <p className="text-xs text-slate-500 mt-0.5">Semua perubahan langsung diperbarui di pratinjau A4</p>
+              <p className="text-xs text-slate-500 mt-0.5">Isi data Anda; contoh format tertera di dalam textbox</p>
             </div>
-            <div className="flex items-center space-x-3">
+            
+            <div className="flex items-center space-x-2 text-xs">
               <button
-                onClick={handleResetData}
-                className="text-xs text-slate-500 hover:text-amber-700 font-medium"
-                title="Reset isi ke template standar"
+                onClick={handleLoadDemo}
+                className="text-blue-600 hover:text-blue-800 font-semibold"
+                title="Tampilkan contoh data lengkap untuk melihat format"
               >
-                Reset Template
+                Muat Contoh
               </button>
+              <span className="text-slate-300">•</span>
+              <button
+                onClick={handleClearForm}
+                className="text-slate-500 hover:text-red-600 font-medium"
+                title="Kosongkan seluruh formulir"
+              >
+                Kosongkan
+              </button>
+              <span className="text-slate-300">•</span>
               <button
                 onClick={() => {
                   const allOpen = Object.values(openSections).every(Boolean);
@@ -852,9 +842,9 @@ export default function App() {
                   Object.keys(openSections).forEach(k => newState[k] = !allOpen);
                   setOpenSections(newState);
                 }}
-                className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                className="text-slate-600 hover:text-slate-900 font-medium"
               >
-                {Object.values(openSections).every(Boolean) ? 'Tutup Semua' : 'Buka Semua'}
+                {Object.values(openSections).every(Boolean) ? 'Tutup' : 'Buka Semua'}
               </button>
             </div>
           </div>
@@ -886,7 +876,7 @@ export default function App() {
                     value={cvData.personalInfo?.fullName || ''}
                     onChange={(e) => handlePersonalInfoChange('fullName', e.target.value)}
                     placeholder="Contoh: MUHAMMAD ARYA PRATAMA"
-                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-semibold"
+                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-semibold placeholder:text-slate-400"
                   />
                 </div>
 
@@ -896,8 +886,8 @@ export default function App() {
                     type="text"
                     value={cvData.personalInfo?.jobTitle || ''}
                     onChange={(e) => handlePersonalInfoChange('jobTitle', e.target.value)}
-                    placeholder="Contoh: Software Engineer | Fullstack Specialist"
-                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Contoh: Software Engineer | Full-Stack Developer"
+                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder:text-slate-400"
                   />
                 </div>
 
@@ -908,8 +898,8 @@ export default function App() {
                       type="email"
                       value={cvData.personalInfo?.email || ''}
                       onChange={(e) => handlePersonalInfoChange('email', e.target.value)}
-                      placeholder="nama@email.com"
-                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Contoh: nama.lengkap@email.com"
+                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder:text-slate-400"
                     />
                   </div>
                   <div>
@@ -918,8 +908,8 @@ export default function App() {
                       type="text"
                       value={cvData.personalInfo?.phone || ''}
                       onChange={(e) => handlePersonalInfoChange('phone', e.target.value)}
-                      placeholder="+62 812-xxxx-xxxx"
-                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Contoh: +62 812-3456-7890"
+                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder:text-slate-400"
                     />
                   </div>
                 </div>
@@ -931,8 +921,8 @@ export default function App() {
                       type="text"
                       value={cvData.personalInfo?.location || ''}
                       onChange={(e) => handlePersonalInfoChange('location', e.target.value)}
-                      placeholder="Jakarta, Indonesia"
-                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Contoh: Jakarta, Indonesia"
+                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder:text-slate-400"
                     />
                   </div>
                   <div>
@@ -941,8 +931,8 @@ export default function App() {
                       type="text"
                       value={cvData.personalInfo?.linkedin || ''}
                       onChange={(e) => handlePersonalInfoChange('linkedin', e.target.value)}
-                      placeholder="linkedin.com/in/username"
-                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Contoh: linkedin.com/in/username"
+                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder:text-slate-400"
                     />
                   </div>
                 </div>
@@ -954,8 +944,8 @@ export default function App() {
                       type="text"
                       value={cvData.personalInfo?.github || ''}
                       onChange={(e) => handlePersonalInfoChange('github', e.target.value)}
-                      placeholder="github.com/username"
-                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Contoh: github.com/username"
+                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder:text-slate-400"
                     />
                   </div>
                   <div>
@@ -964,13 +954,13 @@ export default function App() {
                       type="text"
                       value={cvData.personalInfo?.website || ''}
                       onChange={(e) => handlePersonalInfoChange('website', e.target.value)}
-                      placeholder="portofolio.com"
-                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Contoh: portofolio.com"
+                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder:text-slate-400"
                     />
                   </div>
                 </div>
 
-                {/* Optional Photo Toggle */}
+                {/* Toggle Foto Profil */}
                 <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <input
@@ -981,7 +971,7 @@ export default function App() {
                       className="rounded text-blue-600 focus:ring-blue-500 h-4 w-4"
                     />
                     <label htmlFor="togglePhoto" className="text-xs text-slate-700 font-medium cursor-pointer">
-                      Tampilkan Foto Profil (Catatan: Standar ATS murni umumnya tanpa foto)
+                      Tampilkan Foto Profil (Format ATS murni umumnya tanpa foto)
                     </label>
                   </div>
                 </div>
@@ -993,7 +983,7 @@ export default function App() {
                       type="text"
                       value={cvData.personalInfo?.photoUrl || ''}
                       onChange={(e) => handlePersonalInfoChange('photoUrl', e.target.value)}
-                      placeholder="https://example.com/foto.jpg"
+                      placeholder="Contoh: https://example.com/foto.jpg"
                       className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
                     />
                   </div>
@@ -1026,8 +1016,8 @@ export default function App() {
                   rows={4}
                   value={cvData.summary || ''}
                   onChange={(e) => setCvData(prev => ({ ...prev, summary: e.target.value }))}
-                  placeholder="Tuliskan ringkasan diri yang kuat, menyebutkan latar belakang pendidikan, spesialisasi teknis, dan pencapaian terukur..."
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 leading-relaxed"
+                  placeholder="Contoh: Lulusan Ilmu Komputer dengan pengalaman 2+ tahun mengembangkan aplikasi berbasis React dan Node.js. Memiliki rekam jejak sukses mengoptimalkan performa web hingga 28% serta memenangkan kompetisi Hackathon tingkat nasional..."
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 leading-relaxed placeholder:text-slate-400"
                 />
                 <div className="flex items-center justify-between text-xs text-slate-500">
                   <span>Tips J CV: Gunakan kata kerja aktif dan angka kuantitatif (%)</span>
@@ -1074,7 +1064,7 @@ export default function App() {
                         </button>
                         <button
                           onClick={() => handleMoveArrayItem('education', index, 1)}
-                          disabled={index === cvData.education.length - 1}
+                          disabled={index === (cvData.education || []).length - 1}
                           className="p-1 hover:bg-slate-200 rounded disabled:opacity-30 text-slate-600"
                           title="Geser ke bawah"
                         >
@@ -1095,20 +1085,20 @@ export default function App() {
                         <label className="block text-[11px] font-semibold text-slate-600">Nama Kampus / Universitas</label>
                         <input
                           type="text"
-                          value={edu.institution}
+                          value={edu.institution || ''}
                           onChange={(e) => handleArrayItemChange('education', index, 'institution', e.target.value)}
-                          placeholder="Universitas Indonesia"
-                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500"
+                          placeholder="Contoh: Universitas Indonesia"
+                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500 placeholder:text-slate-400"
                         />
                       </div>
                       <div>
                         <label className="block text-[11px] font-semibold text-slate-600">Kota / Lokasi Kampus</label>
                         <input
                           type="text"
-                          value={edu.city}
+                          value={edu.city || ''}
                           onChange={(e) => handleArrayItemChange('education', index, 'city', e.target.value)}
-                          placeholder="Depok, Jawa Barat"
-                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500"
+                          placeholder="Contoh: Depok, Jawa Barat"
+                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500 placeholder:text-slate-400"
                         />
                       </div>
                     </div>
@@ -1118,20 +1108,20 @@ export default function App() {
                         <label className="block text-[11px] font-semibold text-slate-600">Gelar & Program Studi</label>
                         <input
                           type="text"
-                          value={edu.degree}
+                          value={edu.degree || ''}
                           onChange={(e) => handleArrayItemChange('education', index, 'degree', e.target.value)}
-                          placeholder="S.Kom - Ilmu Komputer"
-                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500"
+                          placeholder="Contoh: Sarjana Komputer (S.Kom) - Ilmu Komputer"
+                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500 placeholder:text-slate-400"
                         />
                       </div>
                       <div>
                         <label className="block text-[11px] font-semibold text-slate-600">IPK / GPA</label>
                         <input
                           type="text"
-                          value={edu.gpa}
+                          value={edu.gpa || ''}
                           onChange={(e) => handleArrayItemChange('education', index, 'gpa', e.target.value)}
-                          placeholder="3.88 / 4.00"
-                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500"
+                          placeholder="Contoh: 3.88 / 4.00"
+                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500 placeholder:text-slate-400"
                         />
                       </div>
                     </div>
@@ -1141,20 +1131,20 @@ export default function App() {
                         <label className="block text-[11px] font-semibold text-slate-600">Mulai (Bulan/Tahun)</label>
                         <input
                           type="text"
-                          value={edu.startDate}
+                          value={edu.startDate || ''}
                           onChange={(e) => handleArrayItemChange('education', index, 'startDate', e.target.value)}
-                          placeholder="Agu 2020"
-                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500"
+                          placeholder="Contoh: Agu 2020"
+                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500 placeholder:text-slate-400"
                         />
                       </div>
                       <div>
                         <label className="block text-[11px] font-semibold text-slate-600">Selesai (Bulan/Tahun)</label>
                         <input
                           type="text"
-                          value={edu.endDate}
+                          value={edu.endDate || ''}
                           onChange={(e) => handleArrayItemChange('education', index, 'endDate', e.target.value)}
-                          placeholder="Jul 2024 / Sekarang"
-                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500"
+                          placeholder="Contoh: Jul 2024 / Sekarang"
+                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500 placeholder:text-slate-400"
                         />
                       </div>
                     </div>
@@ -1179,10 +1169,10 @@ export default function App() {
                             <span className="text-slate-400 text-xs">•</span>
                             <input
                               type="text"
-                              value={bullet}
+                              value={bullet || ''}
                               onChange={(e) => handleBulletChange('education', index, bIdx, e.target.value)}
-                              placeholder="Deskripsi kegiatan atau pencapaian..."
-                              className="flex-1 px-2.5 py-1 text-xs border border-slate-300 rounded bg-white focus:ring-1 focus:ring-blue-500"
+                              placeholder="Contoh: Penerima Beasiswa Prestasi Unggulan Kemendikbudristek..."
+                              className="flex-1 px-2.5 py-1 text-xs border border-slate-300 rounded bg-white focus:ring-1 focus:ring-blue-500 placeholder:text-slate-400"
                             />
                             <button
                               type="button"
@@ -1256,7 +1246,7 @@ export default function App() {
                         </button>
                         <button
                           onClick={() => handleMoveArrayItem('experience', index, 1)}
-                          disabled={index === cvData.experience.length - 1}
+                          disabled={index === (cvData.experience || []).length - 1}
                           className="p-1 hover:bg-slate-200 rounded disabled:opacity-30 text-slate-600"
                           title="Geser ke bawah"
                         >
@@ -1274,23 +1264,23 @@ export default function App() {
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                       <div>
-                        <label className="block text-[11px] font-semibold text-slate-600">Nama Perusahaan / Bisnis</label>
+                        <label className="block text-[11px] font-semibold text-slate-600">Nama Perusahaan / Organisasi Bisnis</label>
                         <input
                           type="text"
-                          value={exp.company}
+                          value={exp.company || ''}
                           onChange={(e) => handleArrayItemChange('experience', index, 'company', e.target.value)}
-                          placeholder="PT GoTo Gojek Tokopedia Tbk"
-                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500 font-semibold"
+                          placeholder="Contoh: PT GoTo Gojek Tokopedia Tbk"
+                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500 font-semibold placeholder:text-slate-400"
                         />
                       </div>
                       <div>
                         <label className="block text-[11px] font-semibold text-slate-600">Posisi / Jabatan</label>
                         <input
                           type="text"
-                          value={exp.role}
+                          value={exp.role || ''}
                           onChange={(e) => handleArrayItemChange('experience', index, 'role', e.target.value)}
-                          placeholder="Software Engineer Intern"
-                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500"
+                          placeholder="Contoh: Software Engineer Intern"
+                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500 placeholder:text-slate-400"
                         />
                       </div>
                     </div>
@@ -1300,30 +1290,30 @@ export default function App() {
                         <label className="block text-[11px] font-semibold text-slate-600">Lokasi Kantor</label>
                         <input
                           type="text"
-                          value={exp.location}
+                          value={exp.location || ''}
                           onChange={(e) => handleArrayItemChange('experience', index, 'location', e.target.value)}
-                          placeholder="Jakarta / Remote"
-                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500"
+                          placeholder="Contoh: Jakarta / Remote"
+                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500 placeholder:text-slate-400"
                         />
                       </div>
                       <div>
                         <label className="block text-[11px] font-semibold text-slate-600">Mulai</label>
                         <input
                           type="text"
-                          value={exp.startDate}
+                          value={exp.startDate || ''}
                           onChange={(e) => handleArrayItemChange('experience', index, 'startDate', e.target.value)}
-                          placeholder="Feb 2024"
-                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500"
+                          placeholder="Contoh: Feb 2024"
+                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500 placeholder:text-slate-400"
                         />
                       </div>
                       <div>
                         <label className="block text-[11px] font-semibold text-slate-600">Selesai</label>
                         <input
                           type="text"
-                          value={exp.endDate}
+                          value={exp.endDate || ''}
                           onChange={(e) => handleArrayItemChange('experience', index, 'endDate', e.target.value)}
-                          placeholder="Sekarang / Agu 2024"
-                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500"
+                          placeholder="Contoh: Sekarang / Agu 2024"
+                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500 placeholder:text-slate-400"
                         />
                       </div>
                     </div>
@@ -1348,10 +1338,10 @@ export default function App() {
                             <span className="text-slate-400 text-xs">•</span>
                             <textarea
                               rows={2}
-                              value={bullet}
+                              value={bullet || ''}
                               onChange={(e) => handleBulletChange('experience', index, bIdx, e.target.value)}
-                              placeholder="Deskripsi terukur..."
-                              className="flex-1 px-2.5 py-1 text-xs border border-slate-300 rounded bg-white focus:ring-1 focus:ring-blue-500"
+                              placeholder="Contoh: Mengembangkan 12+ modul komponen reusable berbasis React yang meningkatkan kecepatan loading sebesar 25%..."
+                              className="flex-1 px-2.5 py-1 text-xs border border-slate-300 rounded bg-white focus:ring-1 focus:ring-blue-500 placeholder:text-slate-400"
                             />
                             <button
                               type="button"
@@ -1424,7 +1414,7 @@ export default function App() {
                         </button>
                         <button
                           onClick={() => handleMoveArrayItem('organization', index, 1)}
-                          disabled={index === cvData.organization.length - 1}
+                          disabled={index === (cvData.organization || []).length - 1}
                           className="p-1 hover:bg-slate-200 rounded disabled:opacity-30 text-slate-600"
                           title="Geser ke bawah"
                         >
@@ -1445,20 +1435,20 @@ export default function App() {
                         <label className="block text-[11px] font-semibold text-slate-600">Nama Organisasi / Komunitas</label>
                         <input
                           type="text"
-                          value={org.name}
+                          value={org.name || ''}
                           onChange={(e) => handleArrayItemChange('organization', index, 'name', e.target.value)}
-                          placeholder="BEM Fakultas Ilmu Komputer UI"
-                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500 font-semibold"
+                          placeholder="Contoh: BEM Fakultas Ilmu Komputer UI"
+                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500 font-semibold placeholder:text-slate-400"
                         />
                       </div>
                       <div>
                         <label className="block text-[11px] font-semibold text-slate-600">Jabatan / Posisi</label>
                         <input
                           type="text"
-                          value={org.role}
+                          value={org.role || ''}
                           onChange={(e) => handleArrayItemChange('organization', index, 'role', e.target.value)}
-                          placeholder="Kepala Departemen IT"
-                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500"
+                          placeholder="Contoh: Kepala Departemen IT"
+                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500 placeholder:text-slate-400"
                         />
                       </div>
                     </div>
@@ -1468,30 +1458,30 @@ export default function App() {
                         <label className="block text-[11px] font-semibold text-slate-600">Lokasi</label>
                         <input
                           type="text"
-                          value={org.location}
+                          value={org.location || ''}
                           onChange={(e) => handleArrayItemChange('organization', index, 'location', e.target.value)}
-                          placeholder="Depok, Indonesia"
-                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500"
+                          placeholder="Contoh: Depok, Indonesia"
+                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500 placeholder:text-slate-400"
                         />
                       </div>
                       <div>
                         <label className="block text-[11px] font-semibold text-slate-600">Mulai</label>
                         <input
                           type="text"
-                          value={org.startDate}
+                          value={org.startDate || ''}
                           onChange={(e) => handleArrayItemChange('organization', index, 'startDate', e.target.value)}
-                          placeholder="Jan 2023"
-                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500"
+                          placeholder="Contoh: Jan 2023"
+                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500 placeholder:text-slate-400"
                         />
                       </div>
                       <div>
                         <label className="block text-[11px] font-semibold text-slate-600">Selesai</label>
                         <input
                           type="text"
-                          value={org.endDate}
+                          value={org.endDate || ''}
                           onChange={(e) => handleArrayItemChange('organization', index, 'endDate', e.target.value)}
-                          placeholder="Des 2023"
-                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500"
+                          placeholder="Contoh: Des 2023"
+                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500 placeholder:text-slate-400"
                         />
                       </div>
                     </div>
@@ -1516,10 +1506,10 @@ export default function App() {
                             <span className="text-slate-400 text-xs">•</span>
                             <textarea
                               rows={2}
-                              value={bullet}
+                              value={bullet || ''}
                               onChange={(e) => handleBulletChange('organization', index, bIdx, e.target.value)}
-                              placeholder="Deskripsi kontribusi..."
-                              className="flex-1 px-2.5 py-1 text-xs border border-slate-300 rounded bg-white focus:ring-1 focus:ring-blue-500"
+                              placeholder="Contoh: Memimpin tim dalam merilis portal informasi terpadu yang diakses 2.500+ mahasiswa..."
+                              className="flex-1 px-2.5 py-1 text-xs border border-slate-300 rounded bg-white focus:ring-1 focus:ring-blue-500 placeholder:text-slate-400"
                             />
                             <button
                               type="button"
@@ -1583,8 +1573,8 @@ export default function App() {
                     rows={2}
                     value={cvData.skills?.hardSkills || ''}
                     onChange={(e) => handleSkillsChange('hardSkills', e.target.value)}
-                    placeholder="React.js, Next.js, TypeScript, Node.js, Tailwind CSS, PostgreSQL, Docker..."
-                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="Contoh: React.js, Next.js, TypeScript, Node.js, Tailwind CSS, PostgreSQL, Docker..."
+                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400"
                   />
                 </div>
 
@@ -1596,8 +1586,8 @@ export default function App() {
                     type="text"
                     value={cvData.skills?.softSkills || ''}
                     onChange={(e) => handleSkillsChange('softSkills', e.target.value)}
-                    placeholder="Agile/Scrum, Problem Solving, Cross-functional Collaboration..."
-                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="Contoh: Agile/Scrum, Problem Solving, Cross-functional Collaboration..."
+                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400"
                   />
                 </div>
 
@@ -1609,8 +1599,8 @@ export default function App() {
                     type="text"
                     value={cvData.skills?.languages || ''}
                     onChange={(e) => handleSkillsChange('languages', e.target.value)}
-                    placeholder="Bahasa Indonesia (Native), English (Professional - TOEFL 610)..."
-                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="Contoh: Bahasa Indonesia (Native), English (Professional - TOEFL 600)..."
+                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400"
                   />
                 </div>
               </div>
@@ -1672,20 +1662,20 @@ export default function App() {
                         <label className="block text-[11px] font-semibold text-slate-600">Nama Proyek</label>
                         <input
                           type="text"
-                          value={proj.name}
+                          value={proj.name || ''}
                           onChange={(e) => handleArrayItemChange('projects', index, 'name', e.target.value)}
-                          placeholder="CareerPath - AI Resume Matcher"
-                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500 font-semibold"
+                          placeholder="Contoh: CareerPath - AI Resume Matcher"
+                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500 font-semibold placeholder:text-slate-400"
                         />
                       </div>
                       <div>
                         <label className="block text-[11px] font-semibold text-slate-600">Peran Anda</label>
                         <input
                           type="text"
-                          value={proj.role}
+                          value={proj.role || ''}
                           onChange={(e) => handleArrayItemChange('projects', index, 'role', e.target.value)}
-                          placeholder="Lead Fullstack Developer"
-                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500"
+                          placeholder="Contoh: Lead Fullstack Developer"
+                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500 placeholder:text-slate-400"
                         />
                       </div>
                     </div>
@@ -1695,20 +1685,20 @@ export default function App() {
                         <label className="block text-[11px] font-semibold text-slate-600">Tahun / Periode</label>
                         <input
                           type="text"
-                          value={proj.year}
+                          value={proj.year || ''}
                           onChange={(e) => handleArrayItemChange('projects', index, 'year', e.target.value)}
-                          placeholder="2024"
-                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500"
+                          placeholder="Contoh: 2024"
+                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500 placeholder:text-slate-400"
                         />
                       </div>
                       <div>
                         <label className="block text-[11px] font-semibold text-slate-600">Link Repository / Demo</label>
                         <input
                           type="text"
-                          value={proj.link}
+                          value={proj.link || ''}
                           onChange={(e) => handleArrayItemChange('projects', index, 'link', e.target.value)}
-                          placeholder="github.com/username/project"
-                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500"
+                          placeholder="Contoh: github.com/username/project"
+                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500 placeholder:text-slate-400"
                         />
                       </div>
                     </div>
@@ -1733,10 +1723,10 @@ export default function App() {
                             <span className="text-slate-400 text-xs">•</span>
                             <textarea
                               rows={2}
-                              value={bullet}
+                              value={bullet || ''}
                               onChange={(e) => handleBulletChange('projects', index, bIdx, e.target.value)}
-                              placeholder="Deskripsi fitur dan hasil proyek..."
-                              className="flex-1 px-2.5 py-1 text-xs border border-slate-300 rounded bg-white focus:ring-1 focus:ring-blue-500"
+                              placeholder="Contoh: Mengembangkan web analisis kecocokan resume ATS dengan Next.js yang memiliki 1.500+ pengguna aktif..."
+                              className="flex-1 px-2.5 py-1 text-xs border border-slate-300 rounded bg-white focus:ring-1 focus:ring-blue-500 placeholder:text-slate-400"
                             />
                             <button
                               type="button"
@@ -1809,20 +1799,20 @@ export default function App() {
                         <label className="block text-[11px] font-semibold text-slate-600">Judul Prestasi / Kejuaraan</label>
                         <input
                           type="text"
-                          value={ach.title}
+                          value={ach.title || ''}
                           onChange={(e) => handleArrayItemChange('achievements', index, 'title', e.target.value)}
-                          placeholder="Juara 1 - National Hackathon 2023"
-                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500 font-semibold"
+                          placeholder="Contoh: Juara 1 - National Hackathon 2023"
+                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500 font-semibold placeholder:text-slate-400"
                         />
                       </div>
                       <div>
                         <label className="block text-[11px] font-semibold text-slate-600">Tahun</label>
                         <input
                           type="text"
-                          value={ach.year}
+                          value={ach.year || ''}
                           onChange={(e) => handleArrayItemChange('achievements', index, 'year', e.target.value)}
-                          placeholder="2023"
-                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500"
+                          placeholder="Contoh: 2023"
+                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500 placeholder:text-slate-400"
                         />
                       </div>
                     </div>
@@ -1831,10 +1821,10 @@ export default function App() {
                       <label className="block text-[11px] font-semibold text-slate-600">Deskripsi Singkat / Lembaga Pemberi</label>
                       <input
                         type="text"
-                        value={ach.description}
+                        value={ach.description || ''}
                         onChange={(e) => handleArrayItemChange('achievements', index, 'description', e.target.value)}
-                        placeholder="Deskripsi pencapaian..."
-                        className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500"
+                        placeholder="Contoh: Menyisihkan 350+ tim mahasiswa se-Indonesia..."
+                        className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-blue-500 placeholder:text-slate-400"
                       />
                     </div>
                   </div>
@@ -1976,14 +1966,20 @@ export default function App() {
                     )}
                     <div>
                       <h1
-                        className="text-2xl font-black tracking-wider uppercase"
-                        style={{ color: themeColor }}
+                        className={`text-2xl font-black tracking-wider uppercase ${
+                          !cvData.personalInfo?.fullName ? 'text-slate-300' : ''
+                        }`}
+                        style={{ color: cvData.personalInfo?.fullName ? themeColor : '#94a3b8' }}
                       >
                         {cvData.personalInfo?.fullName || 'NAMA LENGKAP'}
                       </h1>
-                      {cvData.personalInfo?.jobTitle && (
+                      {cvData.personalInfo?.jobTitle ? (
                         <p className="text-xs font-semibold text-slate-700 mt-0.5 tracking-wide">
                           {cvData.personalInfo.jobTitle}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-slate-400 mt-0.5 tracking-wide italic">
+                          Gelar / Posisi Target
                         </p>
                       )}
                     </div>
@@ -2042,6 +2038,11 @@ export default function App() {
                         </span>
                       </>
                     )}
+                    {!cvData.personalInfo?.email && !cvData.personalInfo?.phone && !cvData.personalInfo?.location && (
+                      <span className="text-slate-400 italic text-[10px]">
+                        Lokasi • Telepon • Email • Profil Online
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -2073,15 +2074,15 @@ export default function App() {
                     {cvData.education.map((edu, idx) => (
                       <div key={edu.id || idx} className="space-y-0.5">
                         <div className="flex justify-between items-baseline font-bold text-slate-900">
-                          <span className="text-[11.5px]">{edu.institution}</span>
+                          <span className="text-[11.5px]">{edu.institution || 'Nama Kampus'}</span>
                           <span className="text-[10.5px] font-medium text-slate-700">{edu.city}</span>
                         </div>
                         <div className="flex justify-between items-baseline text-[10.5px] text-slate-800 italic">
                           <span>
-                            {edu.degree} {edu.gpa ? <span className="font-semibold not-italic text-slate-900">• IPK: {edu.gpa}</span> : null}
+                            {edu.degree || 'Gelar / Jurusan'} {edu.gpa ? <span className="font-semibold not-italic text-slate-900">• IPK: {edu.gpa}</span> : null}
                           </span>
                           <span className="not-italic font-medium text-slate-700">
-                            {edu.startDate} – {edu.endDate}
+                            {edu.startDate} {edu.endDate ? `– ${edu.endDate}` : ''}
                           </span>
                         </div>
 
@@ -2110,13 +2111,13 @@ export default function App() {
                     {cvData.experience.map((exp, idx) => (
                       <div key={exp.id || idx} className="space-y-0.5">
                         <div className="flex justify-between items-baseline font-bold text-slate-900">
-                          <span className="text-[11.5px]">{exp.company}</span>
+                          <span className="text-[11.5px]">{exp.company || 'Nama Perusahaan'}</span>
                           <span className="text-[10.5px] font-medium text-slate-700">{exp.location}</span>
                         </div>
                         <div className="flex justify-between items-baseline text-[10.5px] text-slate-800 italic">
-                          <span className="font-semibold text-slate-850 not-italic">{exp.role}</span>
+                          <span className="font-semibold text-slate-850 not-italic">{exp.role || 'Posisi'}</span>
                           <span className="not-italic font-medium text-slate-700">
-                            {exp.startDate} – {exp.endDate}
+                            {exp.startDate} {exp.endDate ? `– ${exp.endDate}` : ''}
                           </span>
                         </div>
 
@@ -2145,13 +2146,13 @@ export default function App() {
                     {cvData.organization.map((org, idx) => (
                       <div key={org.id || idx} className="space-y-0.5">
                         <div className="flex justify-between items-baseline font-bold text-slate-900">
-                          <span className="text-[11.5px]">{org.name}</span>
+                          <span className="text-[11.5px]">{org.name || 'Nama Organisasi'}</span>
                           <span className="text-[10.5px] font-medium text-slate-700">{org.location}</span>
                         </div>
                         <div className="flex justify-between items-baseline text-[10.5px] text-slate-800 italic">
-                          <span className="font-semibold text-slate-850 not-italic">{org.role}</span>
+                          <span className="font-semibold text-slate-850 not-italic">{org.role || 'Jabatan'}</span>
                           <span className="not-italic font-medium text-slate-700">
-                            {org.startDate} – {org.endDate}
+                            {org.startDate} {org.endDate ? `– ${org.endDate}` : ''}
                           </span>
                         </div>
 
@@ -2181,7 +2182,7 @@ export default function App() {
                       <div key={proj.id || idx} className="space-y-0.5">
                         <div className="flex justify-between items-baseline font-bold text-slate-900">
                           <span className="text-[11.5px]">
-                            {proj.name}
+                            {proj.name || 'Nama Proyek'}
                             {proj.link && (
                               <span className="font-normal text-[10px] text-blue-700 ml-1.5 underline">
                                 ({proj.link})
@@ -2221,7 +2222,7 @@ export default function App() {
                     <ul className="list-disc list-outside pl-4 space-y-0.5 text-[10px] text-slate-800 leading-normal pt-0.5">
                       {cvData.achievements.map((ach, idx) => (
                         <li key={ach.id || idx} className="text-justify">
-                          <span className="font-bold text-slate-900">{ach.title}</span> ({ach.year})
+                          <span className="font-bold text-slate-900">{ach.title}</span> {ach.year ? `(${ach.year})` : ''}
                           {ach.description ? ` – ${ach.description}` : ''}
                         </li>
                       ))}
@@ -2259,6 +2260,16 @@ export default function App() {
                   </div>
                 )}
 
+                {/* Empty State Guide jika seluruh seksi belum diisi */}
+                {!cvData.summary && (!cvData.education || cvData.education.length === 0) && (!cvData.experience || cvData.experience.length === 0) && (!cvData.skills?.hardSkills) && (
+                  <div className="mt-8 p-6 text-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50">
+                    <p className="text-xs font-semibold text-slate-500">Formulir CV Anda Masih Kosong</p>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Silakan isi data diri, pendidikan, dan pengalaman kerja pada panel Form Editor di sisi kiri.
+                    </p>
+                  </div>
+                )}
+
               </div>
             </div>
           </div>
@@ -2266,17 +2277,8 @@ export default function App() {
       </main>
 
       {/* ==================================================================== */}
-      {/* MODALS: AUTH & MULTI-CV DASHBOARD                                    */}
+      {/* MODAL DASHBOARD MULTI-CV */}
       {/* ==================================================================== */}
-      <AuthModal
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-        onAuthSuccess={(user) => {
-          setCurrentUser(user);
-          fetchUserResumes(user.id);
-        }}
-      />
-
       <DashboardModal
         isOpen={isDashboardModalOpen}
         onClose={() => setIsDashboardModalOpen(false)}
@@ -2290,11 +2292,11 @@ export default function App() {
       />
 
       {/* ==================================================================== */}
-      {/* FOOTER BRANDING                                                      */}
+      {/* FOOTER BRANDING */}
       {/* ==================================================================== */}
       <footer className="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500 no-print mt-auto">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <p>© 2026 J CV Builder SPA — Single Column Harvard/Tech ATS Standard Layout with Supabase Cloud & Vercel</p>
+          <p>© 2026 J CV Builder SPA — Format Standar ATS 1-Kolom dengan Cloud Database Supabase</p>
           <p className="text-slate-400">Dirancang khusus untuk ekspor presisi dokumen format A4</p>
         </div>
       </footer>

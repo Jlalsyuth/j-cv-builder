@@ -1,112 +1,124 @@
 ================================================================================
 PROMPT MASTER: PENGEMBANGAN J CV BUILDER MULTI-USER DENGAN SUPABASE & VERCEL
+(VERSI TERVALIDASI - ANTI BUG URL & ACCESS GATE KETAT)
 ================================================================================
 
-Target Aplikasi:
-Tingkatkan aplikasi web "J CV Builder" dari yang sebelumnya single-user lokal menjadi aplikasi SaaS multi-user yang lebih kompleks, aman, dan siap dideploy ke Vercel dengan database & autentikasi Supabase.
+Tujuan Aplikasi:
+Bangun aplikasi web "J CV Builder" (SaaS pembuat & editor CV ATS 1-kolom) multi-user yang aman, profesional, dan siap dideploy ke Vercel dengan database & autentikasi cloud Supabase.
 
 --------------------------------------------------------------------------------
-1. SPESIFIKASI TECH STACK & INTEGRASI
+1. TECH STACK & INTEGRASI
 --------------------------------------------------------------------------------
-- Frontend: React.js (Vite), Tailwind CSS, Lucide-React, html2pdf.js.
-- Database & Auth: Supabase (PostgreSQL + Supabase Auth + Row Level Security).
-  Dependensi yang dibutuhkan: `@supabase/supabase-js`.
-- Deployment Platform: Vercel (SPA routing dengan konfigurasi vercel.json).
-- Branding Aplikasi: "J CV Builder" (Single Column ATS Resume Platform).
+- Framework: React.js (Vite)
+- Styling: Tailwind CSS
+- Icons: Lucide-React + inline SVG untuk brand icons (LinkedIn, GitHub)
+- PDF Renderer: html2pdf.js + optimasi CSS @media print
+- Database & Autentikasi: Supabase (@supabase/supabase-js) dengan PostgreSQL & Row Level Security (RLS)
+- Hosting: Vercel (SPA routing dengan vercel.json)
+- Branding: "J CV Builder" (Single Column ATS Resume Platform)
 
 --------------------------------------------------------------------------------
-2. FITUR-FITUR UTAMA YANG WAJIB DIBUAT
+2. SPESIFIKASI FITUR & ATURAN LOGIKA KETAT
 --------------------------------------------------------------------------------
 
-A. PENGHAPUSAN FITUR IMPORT JSON:
-   - Hapus tombol "Import / JSON" dan modal parser JSON yang ada di versi sebelumnya.
-   - Alihkan penyimpanan data dari import/export file ke database cloud Supabase per akun pengguna.
-   - Pertahankan fitur "Export to PDF" dan "Print Document".
+A. GERBANG AKSES OTENTIKASI KETAT (ACCESS GATE):
+   - Pengguna WAJIB login terlebih dahulu sebelum dapat mengakses editor atau melihat isi web.
+   - Jika pengguna belum terautentikasi (`!currentUser`):
+     * Tampilkan layar penuh Halaman Masuk / Daftar Akun (`AuthScreen`) yang modern dan profesional.
+     * Tidak boleh menampilkan formulir editor atau preview dokumen sebelum user berhasil login/register.
+   - Sediakan form login (Email, Password, Show/Hide Password, Validasi, Error Alert) dan form register (Nama Lengkap, Email, Password, Konfirmasi Password).
+   - Setelah login berhasil, arahkan langsung ke Workspace Utama CV dengan data resume milik user tersebut.
 
-B. AUTENTIKASI MULTI-USER (LOGIN & REGISTER):
-   - Buat halaman atau modal autentikasi yang rapi dan profesional (SaaS style):
-     1. Form Register:
-        - Input: Nama Lengkap, Email, Password, Konfirmasi Password.
-        - Validasi: Format email valid, panjang password minimal 6 karakter, password match.
-        - Menggunakan `supabase.auth.signUp()`.
-     2. Form Login:
-        - Input: Email & Password.
-        - Fitur "Ingat Saya" dan penanganan pesan error yang jelas (misal: "Email atau kata sandi salah").
-        - Menggunakan `supabase.auth.signInWithPassword()`.
-     3. Tombol Logout:
-        - Menggunakan `supabase.auth.signOut()`.
-     4. Status Bar Header:
-        - Menampilkan avatar / inisial dan nama user yang sedang login.
-        - Tombol "Keluar / Logout".
-
-C. DASHBOARD MULTI-CV (PENGELOLAAN BANYAK CV PER USER):
-   - Setiap pengguna yang login dapat membuat dan mengelola LEBIH DARI 1 CV (misal: "CV Frontend Engineer", "CV Data Analyst", dll).
-   - Tampilan Dashboard / Modal CV Saya:
-     - Daftar kartu CV milik user dengan judul CV, tanggal update terakhir, dan badge status.
-     - Tombol "Buat CV Baru" (+ Create New Resume).
-     - Tombol "Buka / Edit" CV yang dipilih ke dalam Editor & Preview.
-     - Tombol "Duplikasi CV" (clone resume).
-     - Tombol "Hapus CV" dengan konfirmasi dialog.
-   - Status Auto-Save / Tombol Simpan ke Cloud:
-     - Indikator status simpan ("Tersimpan di Cloud", "Menyimpan...", atau "Ada perubahan belum tersimpan").
-
-D. SKEMA DATABASE SUPABASE (POSTGRESQL + RLS):
-   Sediakan skrip SQL di file skema (misal `supabase_schema.sql`) yang mencakup:
-   1. Tabel `resumes`:
-      - `id`: UUID (Primary Key, default uuid_generate_v4()).
-      - `user_id`: UUID (Foreign Key ke auth.users, ON DELETE CASCADE).
-      - `title`: TEXT (default: 'Resume Tanpa Judul').
-      - `content`: JSONB (Menyimpan seluruh struktur CV: personalInfo, education, experience, dll).
-      - `created_at`: TIMESTAMPTZ (default now()).
-      - `updated_at`: TIMESTAMPTZ (default now()).
-   2. Row Level Security (RLS):
-      - Aktifkan RLS pada tabel `resumes`.
-      - Policy SELECT, INSERT, UPDATE, DELETE hanya untuk user yang terotentikasi dan memiliki `auth.uid() = user_id`.
-
-E. FORM EDITOR & LIVE PREVIEW A4 (TETAP DIPERTAHANKAN):
-   - Kolom Kiri: Form Editor Interaktif (Data Diri, Ringkasan, Pendidikan, Pengalaman Kerja, Organisasi, Keterampilan, Proyek, Prestasi).
-   - Kolom Kanan: Pratinjau Real-Time A4 presisi (210mm x 297mm) 1-kolom ATS-friendly style dengan kontrol zoom, font, warna, dan spasi.
-   - Export ke PDF A4 dengan html2pdf.js dan fallback native print dialog.
-
-F. DEPLOYMENT & ENVIRONMENT CONFIGURATION:
-   - Buat file `.env.example`:
+B. PENCEGAHAN BUG URL SUPABASE (SANITASI URL OTOMATIS):
+   - PENTING: Sering terjadi kesalahan input di mana user menempelkan URL dengan akhiran `/rest/v1/` sehingga memicu error "Invalid path specified in request URL".
+   - Klien Supabase (`supabaseClient.js`) WAJIB memiliki fungsi sanitasi URL otomatis sebelum inisialisasi:
+     ```javascript
+     const rawUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
+     const sanitizedUrl = rawUrl
+       .replace(/\/rest\/v1\/?$/i, '')
+       .replace(/\/auth\/v1\/?$/i, '')
+       .replace(/\/+$/, '');
      ```
-     VITE_SUPABASE_URL=https://your-project.supabase.co
-     VITE_SUPABASE_ANON_KEY=your-anon-key
-     ```
-   - Buat file `vercel.json` untuk mencegah 404 pada client-side routing:
+   - Pastikan variabel `VITE_SUPABASE_URL` dan `VITE_SUPABASE_ANON_KEY` dimuat dari `.env`.
+
+C. DATA AWAL CV WAJIB KOSONG (EMPTY DEFAULT):
+   - Jangan mengisi formulir dengan data dummy (tidak boleh ada nama orang atau riwayat bawaan di form awal).
+   - Semua kolom input teks WAJIB menggunakan atribut `placeholder="Contoh: ..."` sebagai panduan format bagi pengguna (contoh: `placeholder="Contoh: MUHAMMAD ARYA PRATAMA"`, `placeholder="Contoh: Universitas Indonesia"`, dll).
+   - Sediakan tombol opsional "Muat Contoh" untuk melihat sampel demo dan "Kosongkan" untuk mereset formulir.
+
+D. DASHBOARD PENGELOLAAN MULTI-CV (BANYAK CV PER AKUN):
+   - Pengguna dapat membuat dan mengelola LEBIH DARI 1 CV di database cloud.
+   - Sediakan modal/dashboard "CV Saya":
+     * Daftar seluruh resume milik user beserta judul dan tanggal update terakhir.
+     * Tombol "+ Buat CV Baru" (membuat resume kosong baru di cloud).
+     * Tombol "Buka CV" (memuat resume ke editor).
+     * Tombol "Duplikasi" (membuat salinan resume).
+     * Tombol "Hapus" (menghapus resume dengan dialog konfirmasi).
+   - Fitur Auto-Save ke cloud Supabase (debounced 1.5 detik) dengan indikator status ("Tersimpan di Cloud", "Menyimpan...", "Perubahan Belum Disimpan").
+
+E. PENGHAPUSAN FITUR IMPORT JSON:
+   - Hapus semua tombol import atau modal parser JSON file yang ada sebelumnya.
+   - Penyimpanan data difokuskan 100% pada database Supabase per akun user.
+
+F. LIVE PREVIEW DOKUMEN A4 & EXPORT PDF:
+   - Pratinjau real-time 1-kolom ATS standar A4 (210mm x 297mm) dengan tanggal & lokasi rata kanan (`flex justify-between`).
+   - Kontrol preview: Zoom In, Zoom Out, Fit (90%), pemilihan font (Inter / Merriweather), pilihan warna aksen, dan spasi (Kompak 1 Lembar / Normal).
+   - Tombol "Export PDF" via html2pdf.js (margin 10mm, skala 2.5x) dan tombol "Print" via browser native print.
+
+G. SKEMA DATABASE SUPABASE (POSTGRESQL + RLS):
+   Sediakan file `supabase_schema.sql`:
+   ```sql
+   CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+   CREATE TABLE IF NOT EXISTS public.resumes (
+       id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+       user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+       title TEXT NOT NULL DEFAULT 'Resume ATS Baru',
+       content JSONB NOT NULL DEFAULT '{}'::jsonb,
+       created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
+       updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+   );
+
+   ALTER TABLE public.resumes ENABLE ROW LEVEL SECURITY;
+
+   CREATE POLICY "Users can select own resumes" ON public.resumes FOR SELECT USING (auth.uid() = user_id);
+   CREATE POLICY "Users can insert own resumes" ON public.resumes FOR INSERT WITH CHECK (auth.uid() = user_id);
+   CREATE POLICY "Users can update own resumes" ON public.resumes FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+   CREATE POLICY "Users can delete own resumes" ON public.resumes FOR DELETE USING (auth.uid() = user_id);
+   ```
+
+H. DEPLOYMENT VERCEL:
+   - Buat berkas `vercel.json` untuk routing SPA:
      ```json
      {
+       "framework": "vite",
        "rewrites": [
          { "source": "/(.*)", "destination": "/index.html" }
        ]
      }
      ```
-   - Buat file helper klien Supabase di `src/lib/supabaseClient.js`.
 
 --------------------------------------------------------------------------------
-3. PANDUAN STRUKTUR BERKAS REKOMENDASI
+3. STRUKTUR BERKAS LENGKAP
 --------------------------------------------------------------------------------
 src/
 ├── lib/
-│   └── supabaseClient.js      # Inisialisasi Supabase client dengan env variable
+│   └── supabaseClient.js      # Klien Supabase + auto URL sanitizer
 ├── components/
-│   ├── AuthModal.jsx          # Komponen Login & Register modal/page
-│   ├── DashboardModal.jsx     # Komponen daftar CV user (Multi-CV list)
-│   ├── FormEditor.jsx         # Form editor kolom kiri
-│   ├── ResumePreview.jsx      # Live preview dokumen A4 kolom kanan
-│   └── Navbar.jsx             # Header bar dengan profil user, save, & export
-├── App.jsx                    # State management utama, router/tab, live sync
+│   ├── AuthScreen.jsx         # Layar penuh Login & Register (Access Gate)
+│   └── DashboardModal.jsx     # Modal pengelolaan Multi-CV
+├── App.jsx                    # State manajemen utama, auth gate, editor & preview
 ├── index.css                  # Tailwind styles & print CSS
 └── main.jsx
-vercel.json                    # Konfigurasi deployment Vercel
-supabase_schema.sql            # Script DDL tabel PostgreSQL & policy RLS Supabase
+vercel.json                    # Konfigurasi SPA Vercel
+supabase_schema.sql            # Script DDL tabel PostgreSQL & policy RLS
+.env                           # Variabel lingkungan VITE_SUPABASE_URL & ANON_KEY
 .env.example                   # Contoh format environment variable
 
 --------------------------------------------------------------------------------
 4. INSTRUKSI EKSEKUSI UNTUK AI:
 --------------------------------------------------------------------------------
-1. Tulis kode secara LENGKAP tanpa memotong bagian kode dengan placeholder atau komentar "// Tulis logika di sini".
-2. Pastikan penanganan saat Supabase belum dikonfigurasi (misal jika env belum diisi, tampilkan notifikasi ramah agar user memasukkan SUPABASE_URL & ANON_KEY).
-3. Pastikan aplikasi langsung siap dideploy ke Vercel tanpa error build (`npm run build` harus exit code 0).
+1. Tulis kode secara LENGKAP tanpa memotong bagian kode dengan placeholder "// TODO".
+2. Pastikan gerbang login aktif (`!currentUser` langsung menampilkan `AuthScreen`).
+3. Pastikan `npm run build` sukses tanpa error sebelum selesai.
 ================================================================================
