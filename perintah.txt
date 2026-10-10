@@ -1,0 +1,112 @@
+================================================================================
+PROMPT MASTER: PENGEMBANGAN J CV BUILDER MULTI-USER DENGAN SUPABASE & VERCEL
+================================================================================
+
+Target Aplikasi:
+Tingkatkan aplikasi web "J CV Builder" dari yang sebelumnya single-user lokal menjadi aplikasi SaaS multi-user yang lebih kompleks, aman, dan siap dideploy ke Vercel dengan database & autentikasi Supabase.
+
+--------------------------------------------------------------------------------
+1. SPESIFIKASI TECH STACK & INTEGRASI
+--------------------------------------------------------------------------------
+- Frontend: React.js (Vite), Tailwind CSS, Lucide-React, html2pdf.js.
+- Database & Auth: Supabase (PostgreSQL + Supabase Auth + Row Level Security).
+  Dependensi yang dibutuhkan: `@supabase/supabase-js`.
+- Deployment Platform: Vercel (SPA routing dengan konfigurasi vercel.json).
+- Branding Aplikasi: "J CV Builder" (Single Column ATS Resume Platform).
+
+--------------------------------------------------------------------------------
+2. FITUR-FITUR UTAMA YANG WAJIB DIBUAT
+--------------------------------------------------------------------------------
+
+A. PENGHAPUSAN FITUR IMPORT JSON:
+   - Hapus tombol "Import / JSON" dan modal parser JSON yang ada di versi sebelumnya.
+   - Alihkan penyimpanan data dari import/export file ke database cloud Supabase per akun pengguna.
+   - Pertahankan fitur "Export to PDF" dan "Print Document".
+
+B. AUTENTIKASI MULTI-USER (LOGIN & REGISTER):
+   - Buat halaman atau modal autentikasi yang rapi dan profesional (SaaS style):
+     1. Form Register:
+        - Input: Nama Lengkap, Email, Password, Konfirmasi Password.
+        - Validasi: Format email valid, panjang password minimal 6 karakter, password match.
+        - Menggunakan `supabase.auth.signUp()`.
+     2. Form Login:
+        - Input: Email & Password.
+        - Fitur "Ingat Saya" dan penanganan pesan error yang jelas (misal: "Email atau kata sandi salah").
+        - Menggunakan `supabase.auth.signInWithPassword()`.
+     3. Tombol Logout:
+        - Menggunakan `supabase.auth.signOut()`.
+     4. Status Bar Header:
+        - Menampilkan avatar / inisial dan nama user yang sedang login.
+        - Tombol "Keluar / Logout".
+
+C. DASHBOARD MULTI-CV (PENGELOLAAN BANYAK CV PER USER):
+   - Setiap pengguna yang login dapat membuat dan mengelola LEBIH DARI 1 CV (misal: "CV Frontend Engineer", "CV Data Analyst", dll).
+   - Tampilan Dashboard / Modal CV Saya:
+     - Daftar kartu CV milik user dengan judul CV, tanggal update terakhir, dan badge status.
+     - Tombol "Buat CV Baru" (+ Create New Resume).
+     - Tombol "Buka / Edit" CV yang dipilih ke dalam Editor & Preview.
+     - Tombol "Duplikasi CV" (clone resume).
+     - Tombol "Hapus CV" dengan konfirmasi dialog.
+   - Status Auto-Save / Tombol Simpan ke Cloud:
+     - Indikator status simpan ("Tersimpan di Cloud", "Menyimpan...", atau "Ada perubahan belum tersimpan").
+
+D. SKEMA DATABASE SUPABASE (POSTGRESQL + RLS):
+   Sediakan skrip SQL di file skema (misal `supabase_schema.sql`) yang mencakup:
+   1. Tabel `resumes`:
+      - `id`: UUID (Primary Key, default uuid_generate_v4()).
+      - `user_id`: UUID (Foreign Key ke auth.users, ON DELETE CASCADE).
+      - `title`: TEXT (default: 'Resume Tanpa Judul').
+      - `content`: JSONB (Menyimpan seluruh struktur CV: personalInfo, education, experience, dll).
+      - `created_at`: TIMESTAMPTZ (default now()).
+      - `updated_at`: TIMESTAMPTZ (default now()).
+   2. Row Level Security (RLS):
+      - Aktifkan RLS pada tabel `resumes`.
+      - Policy SELECT, INSERT, UPDATE, DELETE hanya untuk user yang terotentikasi dan memiliki `auth.uid() = user_id`.
+
+E. FORM EDITOR & LIVE PREVIEW A4 (TETAP DIPERTAHANKAN):
+   - Kolom Kiri: Form Editor Interaktif (Data Diri, Ringkasan, Pendidikan, Pengalaman Kerja, Organisasi, Keterampilan, Proyek, Prestasi).
+   - Kolom Kanan: Pratinjau Real-Time A4 presisi (210mm x 297mm) 1-kolom ATS-friendly style dengan kontrol zoom, font, warna, dan spasi.
+   - Export ke PDF A4 dengan html2pdf.js dan fallback native print dialog.
+
+F. DEPLOYMENT & ENVIRONMENT CONFIGURATION:
+   - Buat file `.env.example`:
+     ```
+     VITE_SUPABASE_URL=https://your-project.supabase.co
+     VITE_SUPABASE_ANON_KEY=your-anon-key
+     ```
+   - Buat file `vercel.json` untuk mencegah 404 pada client-side routing:
+     ```json
+     {
+       "rewrites": [
+         { "source": "/(.*)", "destination": "/index.html" }
+       ]
+     }
+     ```
+   - Buat file helper klien Supabase di `src/lib/supabaseClient.js`.
+
+--------------------------------------------------------------------------------
+3. PANDUAN STRUKTUR BERKAS REKOMENDASI
+--------------------------------------------------------------------------------
+src/
+├── lib/
+│   └── supabaseClient.js      # Inisialisasi Supabase client dengan env variable
+├── components/
+│   ├── AuthModal.jsx          # Komponen Login & Register modal/page
+│   ├── DashboardModal.jsx     # Komponen daftar CV user (Multi-CV list)
+│   ├── FormEditor.jsx         # Form editor kolom kiri
+│   ├── ResumePreview.jsx      # Live preview dokumen A4 kolom kanan
+│   └── Navbar.jsx             # Header bar dengan profil user, save, & export
+├── App.jsx                    # State management utama, router/tab, live sync
+├── index.css                  # Tailwind styles & print CSS
+└── main.jsx
+vercel.json                    # Konfigurasi deployment Vercel
+supabase_schema.sql            # Script DDL tabel PostgreSQL & policy RLS Supabase
+.env.example                   # Contoh format environment variable
+
+--------------------------------------------------------------------------------
+4. INSTRUKSI EKSEKUSI UNTUK AI:
+--------------------------------------------------------------------------------
+1. Tulis kode secara LENGKAP tanpa memotong bagian kode dengan placeholder atau komentar "// Tulis logika di sini".
+2. Pastikan penanganan saat Supabase belum dikonfigurasi (misal jika env belum diisi, tampilkan notifikasi ramah agar user memasukkan SUPABASE_URL & ANON_KEY).
+3. Pastikan aplikasi langsung siap dideploy ke Vercel tanpa error build (`npm run build` harus exit code 0).
+================================================================================
